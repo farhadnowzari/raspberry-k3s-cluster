@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-server-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chat-server
+  template:
+    metadata:
+      labels:
+        app: chat-server
+    spec:
+      containers:
+      - name: chat-server
+        image: nowzarifarhad/fdn-chat-server:raspi1.0
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: "500Mi"
+            cpu: "800m"
+        ports:
+        - containerPort: 9000
+      nodeSelector:
+        node-role.kubernetes.io/worker: 'worker'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chat-server-service
+spec:
+  selector:
+    app: chat-server
+  ports:
+  - name: "chat-server-random"
+    port: 9000
+    targetPort: 9000
+---
+#Traefik Config
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: dashboard-middleware
+  namespace: kubernetes-dashboard
+spec:
+  stripPrefix:
+    prefixes:
+      - /dashboard
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dashboard-ingress-routes
+  namespace: kubernetes-dashboard
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`masterpi`) && PathPrefix(`/dashboard`)
+      kind: Rule
+      services:
+        - name: kubernetes-dashboard
+          port: 443
+          scheme: https
+      middlewares:
+        - name: dashboard-middleware
+  tls: 
+    secretName: masterpi-dashboard-tls
+    hosts:
+      - masterpi
